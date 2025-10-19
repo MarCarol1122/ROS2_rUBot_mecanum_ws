@@ -59,39 +59,34 @@ Then you proceed with:
     ros2 launch my_robot_bringup my_robot_bringup_hw.launch.py
     ````
 - Start rosbridge server websocket (port 9090)
-    - in virtual environment
+    - in virtual environment (TheConstruct's ROS2 virtual environment)
     ````shell
     ros2 launch rosbridge_server main_rosbridge_launch.py
     ````
-    - in Real environment
+    - in general:
     ````shell
-    ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+    ros2 run rosbridge_server rosbridge_websocket --port 9090 --address 0.0.0.0 --ros-args -p default_call_service_timeout:=5.0 -p call_services_in_new_thread:=true -p send_action_goals_in_new_thread:=true
     ````
     This starts a Rosbridge WebSocket server on port 9090
         
 - Run a simple HTTP server. Open PowerShell or CMD and run:
-    - in virtual environment
-    ````shell
-    cd ~/ROS2_rUBot_mecanum_ws/web
-    python3 -m http.server 7000
-    ````
-    - in Real environment
     ````python
     cd ~/ROS2_rUBot_mecanum_ws/web
     python3 -m http.server 8000
     ````
     This starts a simple HTTP server on port 8000.  
-
-## 2. On the **PC Browser**
+- When you open the web Dashboard in the same computer, from new terminal:
+    - in virtual environment (TheConstruct's ROS2 virtual environment), type `webpage_address` and later `rosbridge_address`
+    - in external Disc Ubuntu, type:
+        ````shell
+        firefox http://localhost:8000/
+        ````
+## 2. Dashboard on different **PC Browser**
 
 - Open Chrome / Edge / Firefox.
 
-- Go to the generated `webpage_address`:
-    - Real robot the address will be `http://<ROBOT_IP>:8000/`
-    - Virtual robot you will obtain this address typing `webpage_address` in a new terminal.You have to click on the generated link address and the page (index.html) will be loaded.
-- In the connection field we have to write the address where our RosBridge is run. 
-    - Real robot the address will be `ws://<ROBOT_IP>:9090`
-    - Virtual robot you will obtain this address typing `rosbridge_address` in a new terminal
+- Real robot the address will be `http://<ROBOT_IP>:8000/`
+- In the connection field we have to write the address where our RosBridge is running: `ws://<ROBOT_IP>:9090`
 - Click Connect → it should show Connected.
 
 You will be ready to control your robot from the web page!
