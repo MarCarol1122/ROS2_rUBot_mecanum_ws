@@ -144,18 +144,7 @@ The workspace is compiled only once (it won’t repeat unnecessarily)
 
 Happy robot launching! 🤖🚀
 
-## Graphical display
 
-Open: 
-- Xlaunch
-- or MobaXterm
-
-Then run:
-
-```bash
-export DISPLAY=192.168.1.3:0.0
-rviz2
-```
 ## 3. Complete bringup with Rosbridge and webserver
 
 - Save the 3 service files to /etc/systemd/system/:
