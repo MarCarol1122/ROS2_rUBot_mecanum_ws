@@ -4,6 +4,7 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="rubot">
+
   <!-- Materiales -->
   <material name="yellow">
     <color rgba="0.8 0.8 0.0 1.0"/>
@@ -55,7 +56,6 @@
   </link>
 
   <!-- Ruedas -->
-  <!-- upper_left_wheel -->
   <joint name="upper_left_wheel_joint" type="continuous">
     <origin xyz="0.07 0.1 0"/>
     <parent link="base_link"/>
@@ -71,7 +71,6 @@
     </visual>
   </link>
 
-  <!-- lower_left_wheel -->
   <joint name="lower_left_wheel_joint" type="continuous">
     <origin xyz="-0.085 0.1 0"/>
     <parent link="base_link"/>
@@ -87,7 +86,6 @@
     </visual>
   </link>
 
-  <!-- upper_right_wheel -->
   <joint name="upper_right_wheel_joint" type="continuous">
     <origin xyz="0.07 -0.1 0" rpy="0 0 3.14"/>
     <parent link="base_link"/>
@@ -102,7 +100,6 @@
     </visual>
   </link>
 
-  <!-- lower_right_wheel -->
   <joint name="lower_right_wheel_joint" type="continuous">
     <origin xyz="-0.085 -0.1 0" rpy="0 0 3.14"/>
     <parent link="base_link"/>
@@ -180,9 +177,13 @@
 
   <!-- Colores para Gazebo -->
   <gazebo reference="base_link">
-    <material>Gazebo/Blue</material> <!-- Cambiado de Yellow a Blue -->
+    <material>Gazebo/Blue</material>
     <mu1>0.005</mu1>
     <mu2>0.005</mu2>
+  </gazebo>
+
+  <gazebo reference="custom_top">
+    <material>Gazebo/Orange</material>
   </gazebo>
 
   <gazebo reference="base_scan">
@@ -209,4 +210,5 @@
   <gazebo reference="lower_right_wheel">
     <material>Gazebo/Grey</material>
   </gazebo>
+
 </robot>
