@@ -4,7 +4,7 @@
     <arg name="x0" default="0.0" description="Initial X position of the robot" />
     <arg name="y0" default="0.0" description="Initial Y position of the robot" />
     <arg name="yaw0" default="0.0" description="Initial Yaw orientation of the robot (radians)" />
-    <arg name="robot" default="rubot/rubot_mecanum.urdf"
+    <arg name="robot" default="rubot/rubot_mecanum_custom.urdf"
          description="Name of the URDF file (e.g., rubot_limo.urdf)" />
     <arg name="custom_world" default="square3m_walls.world"
           description="Path to the Gazebo world file to load" />
@@ -13,7 +13,7 @@
     <let name="world_path"
          value="$(find-pkg-share my_robot_bringup)/worlds/$(var custom_world)" />
     <let name="rviz_config_path"
-          value="$(find-pkg-share my_robot_bringup)/rviz/urdf_config2.rviz" />
+          value="$(find-pkg-share my_robot_bringup)/rviz/urdf_config.rviz" />
     <node pkg="joint_state_publisher" exec="joint_state_publisher">
         <param name="use_sim_time" value="$(var use_sim_time)" />
     </node>
