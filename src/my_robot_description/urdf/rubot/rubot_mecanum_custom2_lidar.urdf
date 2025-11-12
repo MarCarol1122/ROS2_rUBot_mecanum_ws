@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="rubot">
+  <!-- Materiales -->
+  <material name="yellow"><color rgba="0.8 0.8 0.0 1.0"/></material>
+  <material name="black"><color rgba="0.15 0.15 0.15 1.0"/></material>
+  <material name="dark_grey"><color rgba="0.2 0.2 0.2 1.0"/></material>
+  <material name="light_grey"><color rgba="0.75 0.75 0.75 1.0"/></material>
+  <material name="blue"><color rgba="0.0 0.2 0.8 1.0"/></material>
+  <material name="white"><color rgba="1.0 1.0 1.0 1.0"/></material>
+  <material name="orange"><color rgba="1.0 0.5 0.0 1.0"/></material>
+
+  <!-- base_footprint -->
+  <link name="base_footprint"/>
+  <joint name="base_link_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+  </joint>
+
+  <!-- base_link -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/base_link.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <geometry><box size="0.23 0.12 0.1"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="5"/>
+      <inertia ixx="0.0104" iyy="0.0292" izz="0.0375" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- Ruedas -->
+  <joint name="upper_left_wheel_joint" type="continuous">
+    <origin xyz="0.07 0.1 0"/>
+    <parent link="base_link"/>
+    <child link="upper_left_wheel"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="upper_left_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/upper_left_wheel.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="lower_left_wheel_joint" type="continuous">
+    <origin xyz="-0.085 0.1 0"/>
+    <parent link="base_link"/>
+    <child link="lower_left_wheel"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+  <link name="lower_left_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/lower_left_wheel.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="upper_right_wheel_joint" type="continuous">
+    <origin xyz="0.07 -0.1 0" rpy="0 0 3.14"/>
+    <parent link="base_link"/>
+    <child link="upper_right_wheel"/>
+  </joint>
+  <link name="upper_right_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/upper_right_wheel.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <joint name="lower_right_wheel_joint" type="continuous">
+    <origin xyz="-0.085 -0.1 0" rpy="0 0 3.14"/>
+    <parent link="base_link"/>
+    <child link="lower_right_wheel"/>
+  </joint>
+  <link name="lower_right_wheel">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/lower_right_wheel.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- Cámara -->
+  <joint name="joint_camera" type="fixed">
+    <origin xyz="0.13 0.0 0.05"/>
+    <parent link="base_link"/>
+    <child link="camera"/>
+  </joint>
+  <link name="camera">
+    <visual>
+      <geometry><box size="0.05 0.05 0.025"/></geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+
+  <!-- LIDAR -->
+  <link name="base_scan">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find my_robot_description)/meshes/rubot/Lidar.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="white"/>
+    </visual>
+  </link>
+  <joint name="scan_joint" type="fixed">
+    <origin xyz="0 0 0.14"/>
+    <parent link="base_link"/>
+    <child link="base_scan"/>
+  </joint>
+
+  <!-- Pieza personalizada superior -->
+  <joint name="custom_top_joint" type="fixed">
+    <origin xyz="0 0 0.18"/>
+    <parent link="base_link"/>
+    <child link="custom_top"/>
+  </joint>
+  <link name="custom_top">
+    <visual>
+      <geometry><box size="0.05 0.05 0.05"/></geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+
+  <!-- Controlador de movimiento mecanum -->
+  <gazebo>
+    <plugin name="mecanum_controller" filename="libgazebo_ros_planar_move.so">
+      <command_topic>cmd_vel</command_topic>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+      <publish_odom>true</publish_odom>
+      <wheel_radius>0.04</wheel_radius>
+      <base_length>0.65</base_length>
+      <base_width>0.65</base_width>
+      <front_left_joint>upper_left_wheel_joint</front_left_joint>
+      <front_right_joint>upper_right_wheel_joint</front_right_joint>
+      <rear_left_joint>lower_left_wheel_joint</rear_left_joint>
+      <rear_right_joint>lower_right_wheel_joint</rear_right_joint>
+    </plugin>
+  </gazebo>
+
+  <!-- Cámara funcional -->
+  <gazebo reference="camera">
+    <sensor name="camera1" type="camera">
+      <update_rate>30.0</update_rate>
+      <camera name="front">
+        <horizontal_fov>1.3962634</horizontal_fov>
+        <image><width>320</width><height>240</height><format>R8G8B8</format></image>
+        <clip><near>0.02</near><far>300</far></clip>
+      </camera>
+      <plugin filename="libgazebo_ros_camera.so" name="camera_controller">
+        <alwaysOn>true</alwaysOn>
+        <visualize>false</visualize>
+        <cameraName>rubot/camera1</cameraName>
+        <imageTopicName>image_raw</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>camera</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- LIDAR funcional -->
+  <gazebo reference="base_scan">
+    <sensor name="lidar" type="ray">
+      <pose>0 0 0 0 0 0</pose>
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <update_rate>5</update_rate>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1.0</resolution>
+            <min_angle>-3.1415</min_angle>
+            <max_angle>3.1415</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.12</min>
+          <max>3.5</max>
+          <resolution>0.015</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </ray>
+      <plugin name="scan" filename="libgazebo_ros_ray_sensor.so">
+        <ros>
+          <remapping>~/out:=scan</remapping>
+        </ros>
+        <output_type>sensor_msgs/LaserScan</output_type>
+        <frame_name>base_scan</frame_name>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <!-- Colores en Gazebo -->
+  <gazebo reference="base_link">
+    <material>Gazebo/Blue</material>
+    <mu1>0.005</mu1>
+    <mu2>0.005</mu2>
+  </gazebo>
+
+  <gazebo reference="custom_top">
+    <material>Gazebo/Orange</material>
+  </gazebo>
+
+  <gazebo reference="base_scan">
+    <material>Gazebo/DarkGrey</material>
+  </gazebo>
+
+  <gazebo reference="camera">
+    <material>Gazebo/Green</material>
+  </gazebo>
+
+  <gazebo reference="upper_left_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="lower_left_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="upper_right_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="lower_right_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+</robot>
