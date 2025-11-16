@@ -27,7 +27,7 @@ class LidarTest(Node):
         angle_increment_deg = scan.angle_increment * 180.0 / 3.14159
 
         # Indices for specific angles in rUBot (-180deg to 180deg at 0.5deg/index)
-        index_0_deg = int((0 - angle_min_deg) / angle_increment_deg)
+        index_0_deg = int((0 - angle_min_deg + 180) / angle_increment_deg)
         index_neg90_deg = int((-90 - angle_min_deg) / angle_increment_deg)
         index_pos90_deg = int((90 - angle_min_deg) / angle_increment_deg)
         dist_0_deg = scan.ranges[index_0_deg]
@@ -36,8 +36,8 @@ class LidarTest(Node):
 
         self.get_logger().info("---- LIDAR readings ----")
         self.get_logger().info(f"Distance at 0°: {dist_0_deg:.2f} m" if dist_0_deg else "No valid reading at 0°")
-        self.get_logger().info(f"Distance at -90°: {dist_neg90_deg:.2f} m" if dist_neg90_deg else "No valid reading at -90°")
-        self.get_logger().info(f"Distance at +90°: {dist_pos90_deg:.2f} m" if dist_pos90_deg else "No valid reading at +90°")
+        self.get_logger().info(f"Distance at 90°: {dist_neg90_deg:.2f} m" if dist_neg90_deg else "No valid reading at -90°")
+        self.get_logger().info(f"Distance at -90°: {dist_pos90_deg:.2f} m" if dist_pos90_deg else "No valid reading at +90°")
 
         custom_range = []
 
