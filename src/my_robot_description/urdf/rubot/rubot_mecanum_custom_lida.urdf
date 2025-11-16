@@ -329,7 +329,7 @@
   <!-- Laser Distance Sensor YDLIDAR X4 controller-->
   <gazebo reference="base_scan">
     <sensor name="lidar" type="ray">
-    <pose>0.215 0 0.215 0 0 0</pose>
+    <pose>0.215 0 0.215 0 0 3.1415</pose>
     <always_on>true</always_on>
     <visualize>false</visualize>
     <update_rate>5</update_rate>
@@ -338,8 +338,8 @@
         <horizontal>
           <samples>720</samples>
           <resolution>1.00000</resolution>
-          <min_angle>0.000000</min_angle>
-          <max_angle>6.280000</max_angle>
+          <min_angle>-3.1415</min_angle>
+          <max_angle>3.1415</max_angle>
         </horizontal>
       </scan>
       <range>
