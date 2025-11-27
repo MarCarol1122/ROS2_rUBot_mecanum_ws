@@ -48,7 +48,7 @@ class LidarTest(Node):
 
         if custom_range:
             closest_distance, element_index = min(custom_range)
-            angle_closest_distance = angle_min_deg + element_index * angle_increment_deg
+            angle_closest_distance = angle_min_deg + 180 + element_index * angle_increment_deg
             
             self.get_logger().info("---- LIDAR readings: Min distance ----")
             self.get_logger().info(f"Minimum distance: {closest_distance:.2f} m at angle {angle_closest_distance:.2f}°")
