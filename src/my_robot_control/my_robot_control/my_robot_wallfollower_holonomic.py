@@ -203,6 +203,14 @@ class WallFollower(Node):
                 f"BACK-RIGHT {min_back_right:.2f} m → "
                 f"very slow + STRONG RIGHT turn (2*w)"
             )
+        #----------------------------------------------------------
+        # RULE 5: BACK obstacle → turn left
+        #----------------------------------------------------------
+        if min_front < self.base_distance:
+            twist.linear.x = 0.0
+            twist.linear.y = self.v_lin
+            twist.angular.z = 0.0
+            action = f"FRONT {min_front:.2f} m → turn LEFT"
 
         # if nothing is visible, twist remains zero -> robot stops
 
