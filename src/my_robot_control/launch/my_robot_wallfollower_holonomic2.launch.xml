@@ -14,7 +14,7 @@
          ======================== -->
     <node
         pkg="my_robot_control"
-        exec="my_robot_wallfollower_holonomic_proba_exec"
+        exec="my_robot_wallfollower_holonomic2_exec"
         name="wall_follower_node2"
         output="screen">
 
