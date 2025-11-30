@@ -5,6 +5,9 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
+# TF2 para giro preciso de 90°
+import tf_transformations
+from tf2_ros import Buffer, TransformListener
 
 class WallFollower(Node):
     def __init__(self):
@@ -23,6 +26,16 @@ class WallFollower(Node):
         self.time_to_stop = float(self.get_parameter('time_to_stop').value)
         self.tol = float(self.get_parameter('tolerance').value)
 
+        # Escape lateral antes de girar 90°
+        self.escape_duration = 1.0
+        self.front_escape_start = None
+
+        # Variables para giro preciso
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.turning_90 = False
+        self.turn_target_yaw = None
+
         # Last commanded twist (will be published periodically)
         self.cmd = Twist()
 
@@ -39,10 +52,6 @@ class WallFollower(Node):
         # Timers
         self.info_timer = self.create_timer(1.0, self.log_info)
         self.stop_timer = self.create_timer(0.05, self.stop_watchdog)
-        self.declare_parameter('escape_duration', 1.0)  # Tiempo lateral antes de girar, en segundos
-        self.escape_duration = float(self.get_parameter('escape_duration').value)
-
-        # Periodic cmd_vel publisher at 10 Hz (0.1 s)
         self.cmd_timer = self.create_timer(0.1, self.cmd_publish_timer_cb)
 
         self._state_action = "Idle"
@@ -52,12 +61,30 @@ class WallFollower(Node):
         self.start_time_s = self.get_clock().now().nanoseconds * 1e-9
 
         self.get_logger().info(
-            "WallFollower (RIGHT tol, BACK_RIGHT when closest) - differential drive."
+            "WallFollower with PRECISE 90° TURN + RIGHT WALL ALIGNMENT"
         )
 
-        self.front_escape_start = None
+    # ----------------------------------------------------------
+    # Odom helpers
+    # ----------------------------------------------------------
+    def get_yaw(self):
+        """Return yaw from /odom→base_link TF."""
+        try:
+            trans = self.tf_buffer.lookup_transform(
+                'odom', 'base_link', rclpy.time.Time()
+            )
+            q = trans.transform.rotation
+            _, _, yaw = tf_transformations.euler_from_quaternion(
+                [q.x, q.y, q.z, q.w]
+            )
+            return yaw
+        except:
+            return None
 
-    #--------------------------------------------------------------------
+    def normalize_angle(self, angle):
+        return math.atan2(math.sin(angle), math.cos(angle))
+
+    # ----------------------------------------------------------
     def stop_watchdog(self):
         """Stop the robot after time_to_stop seconds."""
         if self._shutting_down:
@@ -67,54 +94,38 @@ class WallFollower(Node):
             self.get_logger().info("Stopping due to timeout.")
             self.stop()
 
-    #--------------------------------------------------------------------
+    # ----------------------------------------------------------
     def stop(self):
-        """Safe stop: set cmd to zero Twist, try to publish once, stop timers."""
         self._shutting_down = True
-
-        # Set last command to zero
         self.cmd = Twist()
-
-        # Try a final publish (publisher may still be valid even if shutdown started)
         try:
             self.publisher.publish(self.cmd)
         except Exception:
-            # Context/publisher may already be invalid -> ignore
             pass
-
-        # Cancel timers safely
         for t in [self.info_timer, self.stop_timer, self.cmd_timer]:
             try:
                 t.cancel()
             except Exception:
                 pass
 
-    #--------------------------------------------------------------------
+    # ----------------------------------------------------------
     def cmd_publish_timer_cb(self):
-        """Periodic publisher: send the latest cmd_vel at 10 Hz."""
         if self._shutting_down:
             return
-
         try:
             self.publisher.publish(self.cmd)
         except Exception:
-            # If the context or publisher is invalid, ignore
             pass
 
-    #--------------------------------------------------------------------
+    # ----------------------------------------------------------
     def laser_callback(self, scan):
-        """Compute control action from LIDAR and update self.cmd."""
         if self._shutting_down:
             return
 
         angle_min = math.degrees(scan.angle_min)
         angle_inc = math.degrees(scan.angle_increment)
 
-        FRONT       = []
-        FR_RIGHT    = []
-        RIGHT       = []
-        BACK_RIGHT  = []
-        BACK        = []
+        FRONT, FR_RIGHT, RIGHT, BACK_RIGHT, BACK = [], [], [], [], []
 
         for i, d in enumerate(scan.ranges):
             if not math.isfinite(d):
@@ -132,137 +143,149 @@ class WallFollower(Node):
                 RIGHT.append(d)
             elif -160 <= ang < -110:
                 BACK_RIGHT.append(d)
-            elif -160<= ang <-200:
+            elif -200 <= ang < -160:
                 BACK.append(d)
 
-        # Minimal distances
-        min_front      = min(FRONT)      if FRONT      else float('inf')
-        min_fr_right   = min(FR_RIGHT)   if FR_RIGHT   else float('inf')
-        min_right      = min(RIGHT)      if RIGHT      else float('inf')
+        min_front = min(FRONT) if FRONT else float('inf')
+        min_fr_right = min(FR_RIGHT) if FR_RIGHT else float('inf')
+        min_right = min(RIGHT) if RIGHT else float('inf')
         min_back_right = min(BACK_RIGHT) if BACK_RIGHT else float('inf')
-        min_back       = min(BACK) if BACK else float('inf')
+        min_back = min(BACK) if BACK else float('inf')
 
         twist = Twist()
         action = ""
-        # Si ya no hay obstáculo delante, reseteamos el tipo de pared
-        if min_front >= self.base_distance and self.front_wall_type is not None:
-            self.front_wall_type = None
+
+        # -------------------------------------------
+        # RESET si ya no hay obstáculo delante
+        # -------------------------------------------
         if min_front >= self.base_distance:
             self.front_escape_start = None
+            self.turning_90 = False
+            self.turn_target_yaw = None
 
-        #----------------------------------------------------------
-        # RULE 1: FRONT obstacle → strafe left, then rotate 90° if still blocked
-        #----------------------------------------------------------
+        # ==========================================================
+        # RULE 1: OBSTÁCULO DELANTE → ESCAPE LATERAL + GIRO 90°
+        # ==========================================================
         if min_front < self.base_distance:
 
             now = self.get_clock().now().nanoseconds * 1e-9
 
-            # Inicia la maniobra si no estaba empezada
-            if self.front_escape_start is None:
-                self.front_escape_start = now  
+            # Girando 90° exacto
+            if self.turning_90 and self.turn_target_yaw is not None:
                 twist.linear.x = 0.0
-                twist.linear.y = self.v_lin     # movimiento lateral izquierda
-                twist.angular.z = 0.0
-                action = f"FRONT {min_front:.2f} m → STRAFE LEFT (inicio escape)"
-    
-            # Si ya llevamos tiempo moviéndonos lateralmente
-            elif now - self.front_escape_start < self.escape_duration:
+                twist.linear.y = 0.0
+                current_yaw = self.get_yaw()
+                if current_yaw is None:
+                    twist.angular.z = 0.2
+                    action = "TURNING 90° (NO ODOM)"
+                    self.cmd = twist
+                    return
+                error = self.normalize_angle(self.turn_target_yaw - current_yaw)
+                if abs(error) > math.radians(2):
+                    twist.angular.z = 0.4 * (error / abs(error))
+                    action = f"TURNING 90° EXACT (error={math.degrees(error):.1f}°)"
+                else:
+                    self.turning_90 = False
+                    self.turn_target_yaw = None
+                    twist.angular.z = 0.0
+                    action = "TURN COMPLETED → FORWARD"
+                self.cmd = twist
+                return
+
+            # Escape lateral
+            if self.front_escape_start is None:
+                self.front_escape_start = now
+            if now - self.front_escape_start < self.escape_duration:
                 twist.linear.x = 0.0
                 twist.linear.y = self.v_lin
                 twist.angular.z = 0.0
-                action = f"FRONT {min_front:.2f} m → STRAFE LEFT (en escape)"
-    
-            # → Si ya pasó el tiempo y aún hay obstáculo → GIRAR 90°
+                action = "FRONT → STRAFE LEFT (escape phase)"
             else:
-                twist.linear.x = 0.0
+                current_yaw = self.get_yaw()
+                if current_yaw is not None:
+                    self.turn_target_yaw = self.normalize_angle(current_yaw + math.radians(90))
+                    self.turning_90 = True
+                    action = "FRONT → STARTING PRECISE 90° TURN"
+                else:
+                    twist.angular.z = self.v_ang
+                    action = "FRONT → TURNING (NO ODOM)"
+            self.cmd = twist
+            return
+
+        # ==========================================================
+        # RULE 2: CORRECCIÓN DE INCLINACIÓN RESPECTO A LA PARED
+        # ==========================================================
+        inclination_threshold = 0.05  # diferencia mínima para considerar inclinación
+        if math.isfinite(min_fr_right) and math.isfinite(min_back_right):
+            if min_fr_right > min_back_right + inclination_threshold:
+                # cabeza más lejos → girar ligeramente hacia la pared
+                twist.linear.x = self.v_lin * 0.5
                 twist.linear.y = 0.0
-                twist.angular.z = self.v_ang   # giro en su lugar
-                action = f"FRONT sigue bloqueado → TURN 90° LEFT"
+                twist.angular.z = -self.v_ang * 0.6
+                action = "ALIGN → nose drifting AWAY → rotate RIGHT"
+                self.cmd = twist
+                return
+            elif min_back_right > min_fr_right + inclination_threshold:
+                # cola más lejos → girar ligeramente hacia afuera
+                twist.linear.x = self.v_lin * 0.5
+                twist.linear.y = 0.0
+                twist.angular.z = self.v_ang * 0.6
+                action = "ALIGN → tail drifting AWAY → rotate LEFT"
+                self.cmd = twist
+                return
 
-        # Cuando el giro termine, reseteamos
-        # (simple: en cuanto deje de detectarse obstáculo frontal)
-
-        #----------------------------------------------------------
-        # RULE 2: FRONT-RIGHT obstacle → slow + left
-        #----------------------------------------------------------
-        elif min_fr_right < self.base_distance:
+        # ==========================================================
+        # RULE 3: FRONT-RIGHT obstacle → slow + left
+        # ==========================================================
+        if min_fr_right < self.base_distance:
             twist.linear.x = self.v_lin
             twist.linear.y = self.v_lin
-            twist.angular.z = 0.0
-            action = f"FRONT-RIGHT {min_fr_right:.2f} m → DIAGONAL"
+            action = f"FRONT-RIGHT {min_fr_right:.2f} → DIAGONAL"
 
-        #----------------------------------------------------------
-        # RULE 3: RIGHT visible → control with tolerance band (no vy)
-        #----------------------------------------------------------
+        # ==========================================================
+        # RULE 4: RIGHT visible → tolerance band
+        # ==========================================================
         elif math.isfinite(min_right):
-            # error > 0 → too far; error < 0 → too close
             error = min_right - self.base_distance
-
             if abs(error) <= self.tol:
-                # Inside band: go straight
                 twist.linear.x = self.v_lin
                 twist.linear.y = 0.0
-                twist.angular.z = 0.0
-                action = (
-                    f"RIGHT ~OK ({min_right:.2f} m, target "
-                    f"{self.base_distance:.2f}±{self.tol:.2f}) → STRAIGHT"
-                )
-
+                action = "RIGHT OK → STRAIGHT"
             elif error < 0:
-                # Too close to right wall → slow forward + stronger left turn
                 twist.linear.x = self.v_lin * 0.5
                 twist.linear.y = self.v_lin * 0.5
-                twist.angular.z = 0.0
-                action = (
-                    f"RIGHT too CLOSE ({min_right:.2f} m < "
-                    f"{self.base_distance:.2f}-{self.tol:.2f}) → "
-                    f"forward + strong LEFT turn"
-                )
-
+                action = "RIGHT too CLOSE → LEFT"
             else:
-                # Too far from right wall → slow forward + stronger right turn
                 twist.linear.x = self.v_lin * 0.5
-                twist.linear.y = - self.v_lin * 0.5
-                twist.angular.z = 0.0
-                action = (
-                    f"RIGHT too FAR ({min_right:.2f} m > "
-                    f"{self.base_distance:.2f}+{self.tol:.2f}) → "
-                    f"forward + strong RIGHT turn"
-                )
+                twist.linear.y = -self.v_lin * 0.5
+                action = "RIGHT too FAR → RIGHT"
 
-        #----------------------------------------------------------
-        # RULE 4: BACK-RIGHT → only if it is the most relevant wall
-        #----------------------------------------------------------
+        # ==========================================================
+        # RULE 5: BACK-RIGHT
+        # ==========================================================
         elif math.isfinite(min_back_right) and (
             not math.isfinite(min_right) or min_back_right <= min_right
         ):
-            twist.linear.x = self.v_lin 
+            twist.linear.x = self.v_lin
             twist.linear.y = -self.v_lin
-            twist.angular.z = 0.0
-            action = (
-                f"BACK-RIGHT {min_back_right:.2f} m → DIAGONAL"
-            )
-            
-        
+            action = "BACK-RIGHT → DIAGONAL"
 
-        # if nothing is visible, twist remains zero -> robot stops
+        else:
+            action = "NO WALL → STOP"
 
-        # Update last commanded twist (periodic timer will publish it)
         self.cmd = twist
-
-        # Logging (only on change)
         if action != self._last_action_logged:
-            self.get_logger().info(action if action else "No action (stopped).")
+            self.get_logger().info(action)
             self._last_action_logged = action
-
-        self._state_action = action if action else "Stopped (no wall detected)"
-
+        self._state_action = action
         self.prev_vx = twist.linear.x
         self.prev_vy = twist.linear.y
-    #--------------------------------------------------------------------
+
+    # ----------------------------------------------------------
     def log_info(self):
         if not self._shutting_down:
             self.get_logger().info(self._state_action)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -276,9 +299,10 @@ def main(args=None):
             node.destroy_node()
         except Exception:
             pass
-
         if rclpy.ok():
             rclpy.shutdown()
 
+
 if __name__ == '__main__':
     main()
+
