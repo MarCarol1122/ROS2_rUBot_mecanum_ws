@@ -27,7 +27,7 @@ class WallFollower(Node):
         self.tol = float(self.get_parameter('tolerance').value)
 
         # Escape lateral antes de girar 90°
-        self.escape_duration = 1.0
+        self.escape_duration = 1
         self.front_escape_start = None
 
         # Variables para giro preciso
@@ -241,8 +241,8 @@ class WallFollower(Node):
         # RULE 3: FRONT-RIGHT barrier
         # ==========================================================
         if min_fr_right < self.base_distance:
-            twist.linear.x = self.v_lin
-            twist.linear.y = self.v_lin
+            twist.linear.x = self.v_lin * 0.5
+            twist.linear.y = self.v_lin * 0.5
             action = f"FRONT-RIGHT {min_fr_right:.2f} → DIAGONAL"
 
         # RULE 4: RIGHT wall
@@ -265,8 +265,8 @@ class WallFollower(Node):
         elif math.isfinite(min_back_right) and (
             not math.isfinite(min_right) or min_back_right <= min_right
         ):
-            twist.linear.x = self.v_lin
-            twist.linear.y = -self.v_lin
+            twist.linear.x = self.v_lin * 0.5
+            twist.linear.y = -self.v_lin * 0.5
             action = "BACK-RIGHT → DIAGONAL"
 
         # ==========================================================
